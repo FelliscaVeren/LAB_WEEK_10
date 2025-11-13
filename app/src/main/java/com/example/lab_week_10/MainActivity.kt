@@ -16,17 +16,22 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        prepareViewModel()
+    }
 
-        val button = findViewById<Button>(R.id.button_increment)
-        val textView = findViewById<TextView>(R.id.text_total)
+    private fun updateText(total: Int) {
+        findViewById<TextView>(R.id.text_total).text =
+            getString(R.string.text_total, total)
+    }
 
+    private fun prepareViewModel() {
         // Observe LiveData
-        viewModel.total.observe(this) { total ->
-            textView.text = getString(R.string.text_total, total)
+        viewModel.total.observe(this) {
+            updateText(it)
         }
 
-        // Increment on button click
-        button.setOnClickListener {
+        // Increment button
+        findViewById<Button>(R.id.button_increment).setOnClickListener {
             viewModel.incrementTotal()
         }
     }
