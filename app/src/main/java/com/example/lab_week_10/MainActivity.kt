@@ -1,14 +1,19 @@
 package com.example.lab_week_10
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
+import androidx.room.Room
+import com.example.lab_week_10.database.Total
+import com.example.lab_week_10.database.TotalDatabase
 import com.example.lab_week_10.viewmodels.TotalViewModel
 
 class MainActivity : AppCompatActivity() {
 
+    // ✅ Buat instance database dan viewmodel
+    private val db by lazy { prepareDatabase() }
     private val viewModel by lazy {
         ViewModelProvider(this)[TotalViewModel::class.java]
     }
@@ -16,6 +21,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        initializeValueFromDatabase()
         prepareViewModel()
     }
 
@@ -25,14 +32,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun prepareViewModel() {
-        // Observe LiveData
         viewModel.total.observe(this) {
             updateText(it)
         }
 
-        // Increment button
         findViewById<Button>(R.id.button_increment).setOnClickListener {
             viewModel.incrementTotal()
         }
+    }
+
+    // ✅ Build Room database
+    private fun prepareDatabase(): TotalDatabase {
+        return Room.databaseBuilder(
+            applicationContext,
+            TotalDatabase::class.java,
+            "total-database"
+        ).allowMainThreadQueries() // Untuk demo, boleh di main thread
+            .build()
+    }
+
+    // ✅ Ambil data dari DB, atau buat data baru jika kosong
+    private fun initializeValueFromDatabase() {
+        val totalList = db.totalDao().getTotal(ID)
+        if (totalList.isEmpty()) {
+            db.totalDao().insert(Total(id = 1, total = 0))
+        } else {
+            viewModel.setTotal(totalList.first().total)
+        }
+    }
+
+    // ✅ Simpan data ketika Activity pause
+    override fun onPause() {
+        super.onPause()
+        db.totalDao().update(Total(ID, viewModel.total.value ?: 0))
+    }
+
+    companion object {
+        const val ID: Long = 1
     }
 }
