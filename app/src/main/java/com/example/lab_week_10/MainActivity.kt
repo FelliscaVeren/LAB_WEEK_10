@@ -1,73 +1,97 @@
 package com.example.lab_week_10
 
 import android.os.Bundle
-import android.widget.Button
+import android.widget.Toast
 import android.widget.TextView
+import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import androidx.room.Room
-import com.example.lab_week_10.database.Total
-import com.example.lab_week_10.database.TotalDatabase
+import com.example.lab_week_10.database.*
 import com.example.lab_week_10.viewmodels.TotalViewModel
+import java.util.Date
 
 class MainActivity : AppCompatActivity() {
 
-    // ✅ Buat instance database dan viewmodel
-    private val db by lazy { prepareDatabase() }
-    private val viewModel by lazy {
-        ViewModelProvider(this)[TotalViewModel::class.java]
+    private lateinit var db: TotalDatabase
+    private lateinit var viewModel: TotalViewModel
+
+    companion object {
+        const val ID: Long = 1
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        initializeValueFromDatabase()
-        prepareViewModel()
+        db = Room.databaseBuilder(
+            applicationContext,
+            TotalDatabase::class.java,
+            "total-db"
+        ).allowMainThreadQueries().build()
+
+        viewModel = ViewModelProvider(this)[TotalViewModel::class.java]
+
+        initDatabase()
+        setupViewModel()
+        setupButtons()
     }
 
-    private fun updateText(total: Int) {
-        findViewById<TextView>(R.id.text_total).text =
-            getString(R.string.text_total, total)
-    }
-
-    private fun prepareViewModel() {
-        viewModel.total.observe(this) {
-            updateText(it)
-        }
-
+    private fun setupButtons() {
         findViewById<Button>(R.id.button_increment).setOnClickListener {
             viewModel.incrementTotal()
         }
     }
 
-    // ✅ Build Room database
-    private fun prepareDatabase(): TotalDatabase {
-        return Room.databaseBuilder(
-            applicationContext,
-            TotalDatabase::class.java,
-            "total-database"
-        ).allowMainThreadQueries() // Untuk demo, boleh di main thread
-            .build()
-    }
-
-    // ✅ Ambil data dari DB, atau buat data baru jika kosong
-    private fun initializeValueFromDatabase() {
-        val totalList = db.totalDao().getTotal(ID)
-        if (totalList.isEmpty()) {
-            db.totalDao().insert(Total(id = 1, total = 0))
-        } else {
-            viewModel.setTotal(totalList.first().total)
+    private fun setupViewModel() {
+        viewModel.total.observe(this) {
+            findViewById<TextView>(R.id.text_total).text = "Total: $it"
         }
     }
 
-    // ✅ Simpan data ketika Activity pause
-    override fun onPause() {
-        super.onPause()
-        db.totalDao().update(Total(ID, viewModel.total.value ?: 0))
+    private fun initDatabase() {
+        val existing = db.totalDao().getTotal(ID)
+
+        if (existing == null) {
+            // Jika data belum ada → buat awal
+            val first = Total(
+                id = ID,
+                total = TotalObject(
+                    value = 0,
+                    date = Date().toString()
+                )
+            )
+            db.totalDao().insert(first)
+        } else {
+            // Jika data ada → update ViewModel
+            viewModel.setTotal(existing.total.value)
+        }
     }
 
-    companion object {
-        const val ID: Long = 1
+    override fun onStart() {
+        super.onStart()
+
+        val data = db.totalDao().getTotal(ID)
+        if (data != null) {
+            Toast.makeText(
+                this,
+                "Last updated: ${data.total.date}",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        val updated = Total(
+            id = ID,
+            total = TotalObject(
+                value = viewModel.total.value ?: 0,
+                date = Date().toString()
+            )
+        )
+
+        db.totalDao().update(updated)
     }
 }
